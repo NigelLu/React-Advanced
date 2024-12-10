@@ -1,7 +1,19 @@
 /** @format */
 
 import { useEffect, useState } from "react";
+import client from "../../library/common/axios/client";
 import { ZERO_TIME_INFO, computeTimeInfo } from "./CountdownHelpers";
+
+function getServerTimeOffset(useRTT = true) {
+  const t0 = Date.now();
+  return client.get("server-time").then((res) => {
+    const t1 = Date.now();
+    const RTT = t1 - t0;
+    const offset = res.data.serverTime - t1 + useRTT ? RTT / 2 : 0;
+    return { offset };
+  });
+}
+
 /**
  * self-defined hook to manage logic related to timeInfo state update
  *
@@ -25,6 +37,7 @@ const useCountdown = ({ deadlineTime, showMilliseconds }) => {
   const [timeInfo, setTimeInfo] = useState(ZERO_TIME_INFO);
 
   useEffect(() => {
+    getServerTimeOffset();
     const interval = setInterval(
       () => {
         const newTimeInfo = computeTimeInfo(deadlineTime, showMilliseconds || true);

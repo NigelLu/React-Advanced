@@ -6,6 +6,7 @@
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
+    "axios": "^1.7.9",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.0.2",
@@ -18,7 +19,8 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "prepare": "husky",
-    "pre-commit": "lint-staged"
+    "pre-commit": "lint-staged",
+    "mock-server": "node src/library/utilities/mocks/mockServer.js"
   },
   "lint-staged": {
     "tests/**/*.{js,jsx,ts,tsx,json,css,less,md}": [
@@ -48,7 +50,9 @@
   },
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
+    "cors": "^2.8.5",
     "husky": "^9.1.7",
+    "json-server": "0.17.4",
     "lint-staged": "^15.2.10",
     "prettier": "^3.4.2"
   }
