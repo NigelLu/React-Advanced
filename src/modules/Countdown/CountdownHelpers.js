@@ -1,5 +1,7 @@
 /** @format */
 
+import client from "../../library/common/axios/client";
+
 /**
  * @param {number} timeNumber - the time in number format (can be hour/minute/second)
  * @param {boolean} isMilliseconds - indicates if the timeNumber to format is for milliseconds, default false
@@ -64,4 +66,14 @@ function computeTimeInfo(targetTime, showMilliseconds) {
   };
 }
 
-export { ZERO_TIME_INFO, computeTimeInfo };
+function getServerTimeOffset(useRTT = true) {
+  const t0 = Date.now();
+  return client.get("server-time").then((res) => {
+    const t1 = Date.now();
+    const RTT = t1 - t0;
+    const offset = res.data.serverTime - t1 + useRTT ? RTT / 2 : 0;
+    return { offset };
+  });
+}
+
+export { ZERO_TIME_INFO, computeTimeInfo, getServerTimeOffset };
