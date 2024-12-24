@@ -20,7 +20,7 @@ const routeConfig = () => {
             <Route path={routeNameToRouteMap.HOME} element={<Home />} />
             <Route
               path={routeNameToRouteMap.COUNTDOWN}
-              element={<Countdown {...{ targetDate: Date.now() + 3600000 }} />}
+              element={<Countdown {...{ targetTime: Date.now() + 3600000 }} />}
             />
             <Route path={routeNameToRouteMap.FEEDS} element={<Feeds />} />
             <Route path={routeNameToRouteMap.TABS} element={<Tabs />} />

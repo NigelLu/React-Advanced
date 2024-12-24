@@ -1,115 +1,197 @@
 /** @format */
 
-export function setTimeoutInterval(callback, interval = 1000, timerIdCallback) {
+/**
+ *
+ * @param {function} callback - the callback to be called for each interval
+ * @param {int} interval - number of milliseconds between each call (interval)
+ * @param {function} timerIdCallback - the callback to obtain and update the timerId after each new setTimeout
+ */
+export function setTimeoutInterval({ callback, interval = 1000, timerIdCallback }) {
   const now = Date.now();
   let intervalCount = 0;
   let timerId = null;
 
-  function countdownWithLocalCorrection() {
-    const offset = Math.max(Date.now() - (now + interval * intervalCount++), 500); // * correct offsets no bigger than 500ms
+  function countdown() {
+    const offset = Math.max(Date.now() - (now + interval * intervalCount++), 800); // * correct offsets no bigger than 800 ms
+
     const nextInterval = interval - offset;
 
     timerId = setTimeout(() => {
-      countdownWithLocalCorrection();
+      countdown();
       callback();
     }, nextInterval);
 
     timerIdCallback(timerId);
   }
 
-  countdownWithLocalCorrection();
+  countdown();
 }
 
-export class TimeoutInterval {
-  static nextCallbackId = 0;
+// export class TimeoutInterval {
+//   static nextCallbackId = 0;
 
-  #callbacks = [];
-  #timerId = null;
-  #interval = 1000;
+//   #callbacks = []; // * array of callbacks to call at each interval
+//   #timerId = null; // * attribute to store the timerId for the latest setTimeout
+//   #interval = 1000; // * the length of interval in milliseconds
+//   #now = null; // * time now (corrected with server timestamp)
+//   #targetTime = null;
+//   #serverTime = null;
 
-  constructor(interval = 1000) {
-    // * make sure argument "interval" is valid
-    if (typeof interval !== "number") {
-      console.error("TimeoutInterval: please supply an integer as interval");
-    } else {
-      this.#interval = interval;
-    }
-  }
+//   constructor(interval = 1000, targetTime) {
+//     // * make sure arguments are valid
+//     if (typeof interval !== "number") {
+//       console.error("TimeoutInterval: please supply an integer as interval");
+//     } else {
+//       this.#interval = interval;
+//     }
 
-  start() {
-    setTimeoutInterval(
-      () => {
-        this.#callbacks.forEach(({ callback }) => callback());
-      },
-      this.#interval,
-      (timerId) => (this.#timerId = timerId),
-    );
-  }
+//     if (typeof targetTime !== "number") {
+//       console.error("TimeoutInterval: please supply an integer as interval");
+//     } else {
+//       this.#targetTime = targetTime;
+//     }
+//   }
 
-  stop() {
-    clearTimeout(this.#timerId);
-    this.#timerId = null;
-  }
+//   /**
+//    * start the interval
+//    */
+//   start() {
+//     setTimeoutInterval({
+//       callback: () => {
+//         this.#callbacks.forEach(({ callback }) => callback());
+//       },
+//       targetTime: this.#targetTime,
+//       interval: this.#interval,
+//       timerIdCallback: (timerId) => (this.#timerId = timerId),
+//       currentTimeCallback: (currentTime) => (this.#now = currentTime),
+//       fetchServerTimeStamp: this.getServerTime,
+//       stopTimeoutInterval: this.stop,
+//     });
+//   }
 
-  add(callback, optionalName = null) {
-    if (typeof callback !== "function") {
-      console.error("TimeoutInterval.add: please supply a function as calllback");
-      return;
-    }
+//   /**
+//    * stop the interval and clear the #timerId
+//    */
+//   stop() {
+//     clearTimeout(this.#timerId);
+//     this.#timerId = null;
+//   }
 
-    const nextId = TimeoutInterval.nextCallbackId++;
-    this.#callbacks.push({ id: nextId, callback, name: optionalName });
+//   /**
+//    *
+//    * @param {function} callback - a callback function to call at each interval
+//    * @param {string} optionalName - optional name for the callback function (can be used to search the callback)
+//    * @returns {int} - the Id for the callback that was just added
+//    */
+//   add(callback, optionalName = null) {
+//     if (typeof callback !== "function") {
+//       console.error("TimeoutInterval.add: please supply a function as calllback");
+//       return;
+//     }
 
-    return nextId;
-  }
+//     const nextId = TimeoutInterval.nextCallbackId++;
+//     this.#callbacks.push({ id: nextId, callback, name: optionalName });
 
-  removeByCallbackId(callbackId) {
-    const callbackIdx = this.#callbacks.findIndex((ele) => ele.id === callbackId);
+//     return nextId;
+//   }
 
-    if (callbackIdx === -1) {
-      console.warn(`TimeoutInterval.removeByCallbackId: ${callbackId} is not a valid callback Id`);
-      return false;
-    }
+//   /**
+//    *
+//    * @param {int} callbackId - remove a callback by Id, the Id is a self-incremeting field of the TimeoutInterval class
+//    * @returns - if the removal is successful
+//    */
+//   removeByCallbackId(callbackId) {
+//     const callbackIdx = this.#callbacks.findIndex((ele) => ele.id === callbackId);
 
-    this.#callbacks.splice(callbackIdx, 1);
+//     if (callbackIdx === -1) {
+//       console.warn(`TimeoutInterval.removeByCallbackId: ${callbackId} is not a valid callback Id`);
+//       return false;
+//     }
 
-    if (!this.#callbacks.length) this.stop();
+//     this.#callbacks.splice(callbackIdx, 1);
 
-    return true;
-  }
+//     if (!this.#callbacks.length) this.stop();
 
-  // * will only remove the first occurrence of the callback that has the specified name
-  removeByCallbackName(callbackName) {
-    const callbackIdx = this.#callbacks.findIndex(({ name }) => name === callbackName);
+//     return true;
+//   }
 
-    if (callbackIdx === -1) {
-      console.warn(
-        `TimeoutInterval.removeByCallbackName: ${callbackName} is not a valid callback name`,
-      );
-      return false;
-    }
+//   /**
+//    *
+//    * @param {string} callbackName
+//    * NOTE: will only remove the first occurrence of the callback that has the specified name
+//    * @returns - if the removal is successful
+//    */
+//   removeByCallbackName(callbackName) {
+//     const callbackIdx = this.#callbacks.findIndex(({ name }) => name === callbackName);
 
-    this.#callbacks.splice(callbackIdx, 1);
+//     if (callbackIdx === -1) {
+//       console.warn(
+//         `TimeoutInterval.removeByCallbackName: ${callbackName} is not a valid callback name`,
+//       );
+//       return false;
+//     }
 
-    if (!this.#callbacks.length) this.stop();
+//     this.#callbacks.splice(callbackIdx, 1);
 
-    return true;
-  }
+//     if (!this.#callbacks.length) this.stop();
 
-  removeAll() {
-    this.stop();
-    this.#callbacks.length = 0; // * empty the callback array
-  }
+//     return true;
+//   }
 
-  getTimerId() {
-    if (this.#timerId === null)
-      console.warn(
-        "TimeoutInterval: 'null' timerId returned as the TimeoutInterval has not started",
-      );
-    return this.#timerId;
-  }
+//   /**
+//    * remove all callbacks and stop the interval
+//    */
+//   removeAll() {
+//     this.stop();
+//     this.#callbacks.length = 0; // * empty the callback array
+//   }
 
-  getInterval() {
-    return this.#interval;
-  }
-}
+//   /**
+//    *
+//    * @returns {int} - return the latest timerId
+//    */
+//   getTimerId() {
+//     if (this.#timerId === null)
+//       console.warn(
+//         "TimeoutInterval: 'null' timerId returned as the TimeoutInterval has not started/has stopped",
+//       );
+//     return this.#timerId;
+//   }
+
+//   /**
+//    *
+//    * @returns {int} - return the current time timestamp
+//    */
+//   getCurrentTime() {
+//     if (this.#now === null)
+//       console.warn(
+//         "TimeoutInterval: 'null' currentTime returned as the TimeoutInterval has not started/has stopped",
+//       );
+//     return this.#now;
+//   }
+
+//   /**
+//    *
+//    * @returns {int} - return the interval length
+//    */
+//   getInterval() {
+//     return this.#interval;
+//   }
+
+//   /**
+//    *
+//    * @param {int} serverTime - the server timestamp to set
+//    */
+//   setServerTime(serverTime) {
+//     this.#serverTime = serverTime;
+//   }
+
+//   /**
+//    *
+//    * @returns {int} - the server timestamp
+//    */
+//   getServerTime() {
+//     if (this.#serverTime === null) console.warn("TimeoutInterval: 'null' serverTime returned");
+//     return this.#serverTime;
+//   }
+// }
