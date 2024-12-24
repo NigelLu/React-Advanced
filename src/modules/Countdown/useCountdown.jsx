@@ -8,6 +8,15 @@ import { setTimeoutInterval } from "../../library/utilities/timeoutInterval/Time
 let countdownTimeIntervalId = null;
 let delayToNearestSecondTimerId = null;
 let regularRoundingToNearestSecondTimerId = null;
+const clearTimers = () => {
+  clearTimeout(countdownTimeIntervalId);
+  countdownTimeIntervalId = null;
+  clearTimeout(delayToNearestSecondTimerId);
+  delayToNearestSecondTimerId = null;
+  clearTimeout(regularRoundingToNearestSecondTimerId);
+  regularRoundingToNearestSecondTimerId = null;
+};
+
 /**
  * self-defined hook to manage logic related to timeInfo state update
  *
@@ -77,35 +86,39 @@ const useCountdown = ({
     }, delay);
   }, [interval, updateCurrentTime]);
 
-  // TODO: for debugging purposes, REMOVE once finished
-  useEffect(() => {
-    console.log(currentTime);
-    console.log(serverTimeManager.getLatestOffset());
-  }, [currentTime]);
-
-  // TODO: 1, re-sync after window freezing; 2, longer-countdown when targetTime is far (even stop countdown when not visible)
-  useEffect(() => {
+  const startCountdown = useCallback(() => {
     roundToNearestSecondAndStartCountdown();
     setTimeoutInterval({
       interval: roundToNearestSecondInterval,
       callback: roundToNearestSecondAndStartCountdown,
       timerIdCallback: (newTimerId) => (regularRoundingToNearestSecondTimerId = newTimerId),
     });
+  }, [roundToNearestSecondAndStartCountdown, roundToNearestSecondInterval]);
+
+  // TODO: for debugging purposes, REMOVE once finished
+  useEffect(() => {
+    console.log(currentTime);
+    console.log(serverTimeManager.getLatestOffset());
+  }, [currentTime]);
+
+  // TODO: 1, longer-countdown when targetTime is far
+  useEffect(() => {
+    startCountdown();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        clearTimers();
+      } else if (document.visibilityState === "visible") {
+        startCountdown();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      clearTimeout(countdownTimeIntervalId);
-      countdownTimeIntervalId = null;
-      clearTimeout(delayToNearestSecondTimerId);
-      delayToNearestSecondTimerId = null;
-      clearTimeout(regularRoundingToNearestSecondTimerId);
-      regularRoundingToNearestSecondTimerId = null;
+      clearTimers();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [
-    interval,
-    updateCurrentTime,
-    roundToNearestSecondInterval,
-    roundToNearestSecondAndStartCountdown,
-  ]);
+  }, [startCountdown]);
 
   // * trigger callback based on onBeforeEndConfig
   useEffect(() => {

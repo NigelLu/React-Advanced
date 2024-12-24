@@ -1,6 +1,6 @@
 /** @format */
-import { setTimeoutInterval } from "../../library/utilities/timeoutInterval/TimeoutInterval";
 import { getTimeStampFromServer } from "./utils";
+import { setTimeoutInterval } from "../../library/utilities/timeoutInterval/TimeoutInterval";
 
 class ServerTimeManager {
   #timerId = null;
@@ -9,13 +9,13 @@ class ServerTimeManager {
   #lastFetched = null;
   #latestOffset = null;
 
-  constructor({ fetchServerTime }) {
+  constructor({ fetchServerTime, fetchInterval = 60000 }) {
     this.#fetchServerTime = fetchServerTime;
     this.getAndUpdateServerTime();
     setTimeoutInterval({
-      callback: this.getAndUpdateServerTime.bind(this),
-      interval: 10000,
+      interval: fetchInterval,
       timerIdCallback: this.setTimerId.bind(this),
+      callback: this.getAndUpdateServerTime.bind(this),
     });
   }
 
