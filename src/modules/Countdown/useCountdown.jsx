@@ -5,7 +5,9 @@ import serverTimeManager from "./ServerTimeManager";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { setTimeoutInterval } from "../../library/utilities/timeoutInterval/TimeoutInterval";
 
-let timerId = null;
+let countdownTimeIntervalId = null;
+let delayToNearestSecondTimerId = null;
+let regularRoundingToNearestSecondTimerId = null;
 /**
  * self-defined hook to manage logic related to timeInfo state update
  *
@@ -25,7 +27,8 @@ let timerId = null;
  *   end: true,
  * }
  */
-const useCountdown = ({ targetTime, interval = 1000 }) => {
+const useCountdown = ({ targetTime, interval = 1000, roundToNearestSecondInterval = 60000 }) => {
+  // * init the currentTime, ceiling to the nearest second
   const [currentTime, setCurrentTime] = useState(
     serverTimeManager.getLatestOffset() + Date.now() || Date.now(),
   );
@@ -39,16 +42,67 @@ const useCountdown = ({ targetTime, interval = 1000 }) => {
     setCurrentTime(serverTimeManager.getLatestOffset() + Date.now() || Date.now());
   }, []);
 
-  // TODO: 1, auto-adjust to the nearest second; 2, re-sync after window freezing; 3, last-X-minute callback; 4, longer-countdown when targetTime is far (even stop countdown when not visible)
+  /**
+   * round to the nearest second
+   * restart any existing delay/countdown timer
+   */
+  const roundToNearestSecondAndStartCountdown = useCallback(() => {
+    const nearestSecond =
+      Math.ceil((serverTimeManager.getLatestOffset() + Date.now() || Date.now()) / 1000) * 1000;
+    const delay = nearestSecond - Date.now();
+
+    // * stop previous countdown timerinterval if any
+    if (countdownTimeIntervalId) {
+      clearTimeout(countdownTimeIntervalId);
+      countdownTimeIntervalId = null;
+    }
+
+    // * stop previous delay to nearest second timer if any
+    if (delayToNearestSecondTimerId) {
+      clearTimeout(delayToNearestSecondTimerId);
+      delayToNearestSecondTimerId = null;
+    }
+
+    // * restart everything
+    delayToNearestSecondTimerId = setTimeout(() => {
+      setCurrentTime(nearestSecond);
+      setTimeoutInterval({
+        interval,
+        callback: updateCurrentTime,
+        timerIdCallback: (newTimerId) => (countdownTimeIntervalId = newTimerId),
+      });
+    }, delay);
+  }, [interval, updateCurrentTime]);
+
+  // TODO: for debugging purposes, REMOVE once finished
   useEffect(() => {
+    console.log(currentTime);
+    console.log(serverTimeManager.getLatestOffset());
+  }, [currentTime]);
+
+  // TODO: 1, re-sync after window freezing; 2, last-X-minute callback; 3, longer-countdown when targetTime is far (even stop countdown when not visible)
+  useEffect(() => {
+    roundToNearestSecondAndStartCountdown();
     setTimeoutInterval({
-      interval,
-      callback: updateCurrentTime,
-      timerIdCallback: (newTimerId) => (timerId = newTimerId),
+      interval: roundToNearestSecondInterval,
+      callback: roundToNearestSecondAndStartCountdown,
+      timerIdCallback: (newTimerId) => (regularRoundingToNearestSecondTimerId = newTimerId),
     });
 
-    return () => clearTimeout(timerId);
-  });
+    return () => {
+      clearTimeout(countdownTimeIntervalId);
+      countdownTimeIntervalId = null;
+      clearTimeout(delayToNearestSecondTimerId);
+      delayToNearestSecondTimerId = null;
+      clearTimeout(regularRoundingToNearestSecondTimerId);
+      regularRoundingToNearestSecondTimerId = null;
+    };
+  }, [
+    interval,
+    updateCurrentTime,
+    roundToNearestSecondInterval,
+    roundToNearestSecondAndStartCountdown,
+  ]);
 
   return timeInfo;
 };

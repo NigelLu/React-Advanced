@@ -12,8 +12,7 @@ export function setTimeoutInterval({ callback, interval = 1000, timerIdCallback 
   let timerId = null;
 
   function countdown() {
-    const offset = Math.max(Date.now() - (now + interval * intervalCount++), 800); // * correct offsets no bigger than 800 ms
-
+    const offset = Math.min(Date.now() - (now + interval * intervalCount++), 800); // * correct offsets no bigger than 800 ms
     const nextInterval = interval - offset;
 
     timerId = setTimeout(() => {
