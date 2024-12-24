@@ -13,31 +13,34 @@ let regularRoundingToNearestSecondTimerId = null;
  *
  * @param {int} targetTime - countdown's target/deadline time, in milliseconds since Jan 1st, 1970, UTC
  * @param {int} interval - update frequency for the timeInfo computed state
- * @returns {Object} - timeInfo state, an object indicating the timeInfo state, similar to the one below
- * {
- *   day: 0,
- *   hours: 0,
- *   hoursStr: "00",
- *   minutes: 0,
- *   minutesStr: "00",
- *   seconds: 0,
- *   secondsStr: "00",
- *   milliseconds: 0,
- *   millisecondsStr: "000",
- *   end: true,
- * }
+ * @param {int} roundToNearestSecondInterval - number of milliseconds before each round to nearest second attempt
+ * @param {Object} onBeforeEndConfig - { threshold: <number_of_milliseconds_before_end>, callback: <function> }
+ *
+ * @returns {Object} - timeInfo state, an object indicating the timeInfo state, refer to ./utils.js for more
  */
-const useCountdown = ({ targetTime, interval = 1000, roundToNearestSecondInterval = 60000 }) => {
+const useCountdown = ({
+  targetTime,
+  interval = 1000,
+  roundToNearestSecondInterval = 60000,
+  onBeforeEndConfig = { threshold: 60000, callback: null },
+}) => {
   // * init the currentTime, ceiling to the nearest second
   const [currentTime, setCurrentTime] = useState(
     serverTimeManager.getLatestOffset() + Date.now() || Date.now(),
   );
+  const [callbackTriggered, setCallbackTriggered] = useState(
+    typeof onBeforeEndConfig?.callback !== "function",
+  ); // * if no callback given, then default to true
+
   // * computed property for timeInfo
   const timeInfo = useMemo(
     () => computeTimeInfo({ targetTime, currentTime }),
     [currentTime, targetTime],
   );
 
+  /**
+   * update currentTime callback
+   */
   const updateCurrentTime = useCallback(() => {
     setCurrentTime(serverTimeManager.getLatestOffset() + Date.now() || Date.now());
   }, []);
@@ -80,7 +83,7 @@ const useCountdown = ({ targetTime, interval = 1000, roundToNearestSecondInterva
     console.log(serverTimeManager.getLatestOffset());
   }, [currentTime]);
 
-  // TODO: 1, re-sync after window freezing; 2, last-X-minute callback; 3, longer-countdown when targetTime is far (even stop countdown when not visible)
+  // TODO: 1, re-sync after window freezing; 2, longer-countdown when targetTime is far (even stop countdown when not visible)
   useEffect(() => {
     roundToNearestSecondAndStartCountdown();
     setTimeoutInterval({
@@ -103,6 +106,17 @@ const useCountdown = ({ targetTime, interval = 1000, roundToNearestSecondInterva
     roundToNearestSecondInterval,
     roundToNearestSecondAndStartCountdown,
   ]);
+
+  // * trigger callback based on onBeforeEndConfig
+  useEffect(() => {
+    if (callbackTriggered || !timeInfo || timeInfo.end) return;
+
+    const timeRemaining = targetTime - currentTime;
+    if (timeRemaining <= onBeforeEndConfig.threshold) {
+      onBeforeEndConfig.callback();
+      setCallbackTriggered(true);
+    }
+  }, [callbackTriggered, currentTime, onBeforeEndConfig, targetTime, timeInfo]);
 
   return timeInfo;
 };

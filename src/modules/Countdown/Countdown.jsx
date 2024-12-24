@@ -1,7 +1,7 @@
 /** @format */
 
 import "./Countdown.css";
-import React from "react";
+import React, { useState } from "react";
 import useCountdown from "./useCountdown";
 
 /**
@@ -9,7 +9,11 @@ import useCountdown from "./useCountdown";
  * @returns
  */
 const Countdown = ({ targetTime }) => {
-  const timeInfo = useCountdown({ targetTime });
+  const timeInfo = useCountdown({
+    targetTime,
+    onBeforeEndConfig: { threshold: 3585000, callback: () => setColor("red") },
+  });
+  const [color, setColor] = useState("#1976d2");
 
   return (
     <>
@@ -18,10 +22,18 @@ const Countdown = ({ targetTime }) => {
       <div className='countdown-container'>
         {!timeInfo.end ? (
           <div className='countdown-timer'>
-            <span className='time-segment'>{timeInfo.days}d </span>
-            <span className='time-segment'>{timeInfo.hoursStr}h </span>
-            <span className='time-segment'>{timeInfo.minutesStr}m </span>
-            <span className='time-segment'>{timeInfo.secondsStr}s</span>
+            <span className='time-segment' style={{ color }}>
+              {timeInfo.days}d{" "}
+            </span>
+            <span className='time-segment' style={{ color }}>
+              {timeInfo.hoursStr}h{" "}
+            </span>
+            <span className='time-segment' style={{ color }}>
+              {timeInfo.minutesStr}m{" "}
+            </span>
+            <span className='time-segment' style={{ color }}>
+              {timeInfo.secondsStr}s
+            </span>
           </div>
         ) : (
           <div className='countdown-ended'>Time's up!</div>
