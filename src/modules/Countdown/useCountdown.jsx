@@ -7,8 +7,9 @@ import { setTimeoutInterval } from "../../library/utilities/timeoutInterval/Time
 
 let countdownTimeIntervalId = null;
 let delayToNearestSecondTimerId = null;
+let nearEndCallbackTimerId = null;
 let regularRoundingToNearestSecondTimerId = null;
-const clearTimers = () => {
+const clearCountdownTimers = () => {
   clearTimeout(countdownTimeIntervalId);
   countdownTimeIntervalId = null;
   clearTimeout(delayToNearestSecondTimerId);
@@ -16,35 +17,52 @@ const clearTimers = () => {
   clearTimeout(regularRoundingToNearestSecondTimerId);
   regularRoundingToNearestSecondTimerId = null;
 };
+const clearNearEndCallbackTimerId = () => {
+  clearTimeout(nearEndCallbackTimerId);
+  nearEndCallbackTimerId = null;
+};
 
 /**
  * self-defined hook to manage logic related to timeInfo state update
  *
  * @param {int} targetTime - countdown's target/deadline time, in milliseconds since Jan 1st, 1970, UTC
- * @param {int} interval - update frequency for the timeInfo computed state
+ * @param {function} nearEndCallback - optional callback to execute when the time remaining is within nearEndThreshold
+ * @param {int} nearEndThreshold - threshold in milliseconds before targe time for nearEnd callbacks and update interval to take effect
+ * @param {int} nearEndUpdateInterval - update frequency in milliseconds, when the countdown is within the threshold
+ * @param {boolean} nearEndShowSeconds - whether to show seconds string when the countdown is near the end
  * @param {int} roundToNearestSecondInterval - number of milliseconds before each round to nearest second attempt
- * @param {Object} onBeforeEndConfig - { threshold: <number_of_milliseconds_before_end>, callback: <function> }
+ * @param {Object} updateFrequencyConfig - updateInterval config { updateInterval: <num_milliseconds>, showSeconds: <bool> }
  *
  * @returns {Object} - timeInfo state, an object indicating the timeInfo state, refer to ./utils.js for more
  */
 const useCountdown = ({
   targetTime,
-  interval = 1000,
+  nearEndCallback = null,
+  nearEndThreshold = 60000,
+  nearEndUpdateInterval = 1000,
+  nearEndShowSeconds = true, // * for the sake of simplicity,
   roundToNearestSecondInterval = 60000,
-  onBeforeEndConfig = { threshold: 60000, callback: null },
+  updateFrequencyConfig = { updateInterval: 60000, showSeconds: false },
 }) => {
   // * init the currentTime, ceiling to the nearest second
   const [currentTime, setCurrentTime] = useState(
     serverTimeManager.getLatestOffset() + Date.now() || Date.now(),
   );
-  const [callbackTriggered, setCallbackTriggered] = useState(
-    typeof onBeforeEndConfig?.callback !== "function",
-  ); // * if no callback given, then default to true
+  const [updateInterval, setUpdateInterval] = useState(
+    targetTime - currentTime <= nearEndThreshold
+      ? nearEndUpdateInterval
+      : updateFrequencyConfig.updateInterval,
+  );
+  const [showSeconds, setShowSeconds] = useState(
+    targetTime - currentTime <= nearEndThreshold
+      ? nearEndShowSeconds
+      : updateFrequencyConfig.showSeconds,
+  );
 
   // * computed property for timeInfo
   const timeInfo = useMemo(
-    () => computeTimeInfo({ targetTime, currentTime }),
-    [currentTime, targetTime],
+    () => computeTimeInfo({ targetTime, currentTime, showSeconds }),
+    [currentTime, showSeconds, targetTime],
   );
 
   /**
@@ -59,33 +77,31 @@ const useCountdown = ({
    * restart any existing delay/countdown timer
    */
   const roundToNearestSecondAndStartCountdown = useCallback(() => {
+    // * stop previous timers if any
+    clearTimeout(countdownTimeIntervalId);
+    countdownTimeIntervalId = null;
+    clearTimeout(delayToNearestSecondTimerId);
+    delayToNearestSecondTimerId = null;
+
+    // * compute the delay
     const nearestSecond =
       Math.ceil((serverTimeManager.getLatestOffset() + Date.now() || Date.now()) / 1000) * 1000;
     const delay = nearestSecond - Date.now();
-
-    // * stop previous countdown timerinterval if any
-    if (countdownTimeIntervalId) {
-      clearTimeout(countdownTimeIntervalId);
-      countdownTimeIntervalId = null;
-    }
-
-    // * stop previous delay to nearest second timer if any
-    if (delayToNearestSecondTimerId) {
-      clearTimeout(delayToNearestSecondTimerId);
-      delayToNearestSecondTimerId = null;
-    }
 
     // * restart everything
     delayToNearestSecondTimerId = setTimeout(() => {
       setCurrentTime(nearestSecond);
       setTimeoutInterval({
-        interval,
+        updateInterval,
         callback: updateCurrentTime,
         timerIdCallback: (newTimerId) => (countdownTimeIntervalId = newTimerId),
       });
     }, delay);
-  }, [interval, updateCurrentTime]);
+  }, [updateInterval, updateCurrentTime]);
 
+  /**
+   * callback to start countdown
+   */
   const startCountdown = useCallback(() => {
     roundToNearestSecondAndStartCountdown();
     setTimeoutInterval({
@@ -95,19 +111,21 @@ const useCountdown = ({
     });
   }, [roundToNearestSecondAndStartCountdown, roundToNearestSecondInterval]);
 
-  // TODO: for debugging purposes, REMOVE once finished
-  useEffect(() => {
-    console.log(currentTime);
-    console.log(serverTimeManager.getLatestOffset());
-  }, [currentTime]);
-
-  // TODO: 1, longer-countdown when targetTime is far
+  /**
+   * effect to start the countdown
+   */
   useEffect(() => {
     startCountdown();
+    return clearCountdownTimers;
+  }, [startCountdown]);
 
+  /**
+   * effect to add handlers to deal with visibility changes
+   */
+  useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        clearTimers();
+        clearCountdownTimers();
       } else if (document.visibilityState === "visible") {
         startCountdown();
       }
@@ -115,22 +133,31 @@ const useCountdown = ({
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
-      clearTimers();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [startCountdown]);
 
-  // * trigger callback based on onBeforeEndConfig
+  /**
+   * effect to perform actions when countdown is near end
+   * 1, update updateInterval config when time reached the threshold specified in onNearEndConfig
+   * 2, call the nearEnd callback if any
+   */
   useEffect(() => {
-    if (callbackTriggered || !timeInfo || timeInfo.end) return;
-
-    const timeRemaining = targetTime - currentTime;
-    if (timeRemaining <= onBeforeEndConfig.threshold) {
-      onBeforeEndConfig.callback();
-      setCallbackTriggered(true);
+    const now = serverTimeManager.getLatestOffset() + Date.now() || Date.now();
+    if (targetTime - now > nearEndThreshold) {
+      nearEndCallbackTimerId = setTimeout(
+        () => {
+          setUpdateInterval(nearEndUpdateInterval);
+          setShowSeconds(nearEndShowSeconds);
+          if (typeof nearEndCallback === "function") nearEndCallback();
+        },
+        targetTime - now - nearEndThreshold,
+      );
+    } else {
+      if (typeof nearEndCallback === "function") nearEndCallback();
     }
-  }, [callbackTriggered, currentTime, onBeforeEndConfig, targetTime, timeInfo]);
-
+    return clearNearEndCallbackTimerId;
+  }, [nearEndCallback, nearEndShowSeconds, nearEndThreshold, nearEndUpdateInterval, targetTime]);
   return timeInfo;
 };
 

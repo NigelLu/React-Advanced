@@ -11,7 +11,7 @@ import useCountdown from "./useCountdown";
 const Countdown = ({ targetTime }) => {
   const timeInfo = useCountdown({
     targetTime,
-    onBeforeEndConfig: { threshold: 3585000, callback: () => setColor("red") },
+    nearEndCallback: () => setColor("red"),
   });
   const [color, setColor] = useState("#1976d2");
 
@@ -31,9 +31,13 @@ const Countdown = ({ targetTime }) => {
             <span className='time-segment' style={{ color }}>
               {timeInfo.minutesStr}m{" "}
             </span>
-            <span className='time-segment' style={{ color }}>
-              {timeInfo.secondsStr}s
-            </span>
+            {timeInfo.secondsStr ? (
+              <span className='time-segment' style={{ color }}>
+                {timeInfo.secondsStr}s
+              </span>
+            ) : (
+              <></>
+            )}
           </div>
         ) : (
           <div className='countdown-ended'>Time's up!</div>

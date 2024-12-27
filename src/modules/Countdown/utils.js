@@ -51,10 +51,10 @@ const ZERO_TIME_INFO = {
  *
  * @param {int} targetTime - countdown's target/deadline time, in milliseconds since Jan 1st, 1970, UTC
  * @param {int} currentTime - current time, in milliseconds since Jan 1st, 1970, UTC
- * @param {boolean} showMilliseconds - whether to show milliseconds in the countdown
+ * @param {boolean} showSeconds - whether to return secondsStr
  * @returns
  */
-function computeTimeInfo({ targetTime, currentTime }) {
+function computeTimeInfo({ targetTime, currentTime, showSeconds = false }) {
   const timeRemaining = targetTime - currentTime;
   if (timeRemaining <= 0) {
     return ZERO_TIME_INFO;
@@ -80,7 +80,7 @@ function computeTimeInfo({ targetTime, currentTime }) {
     milliseconds,
     hoursStr: formatTime(hours),
     minutesStr: formatTime(minutes),
-    secondsStr: formatTime(seconds),
+    secondsStr: showSeconds ? formatTime(seconds) : null,
     end: false,
   };
 }
