@@ -1,7 +1,6 @@
 /** @format */
 
 import { computeTimeInfo } from "./utils";
-import serverTimeManager from "./ServerTimeManager";
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { setTimeoutInterval } from "../../library/utilities/timeoutInterval/TimeoutInterval";
 
@@ -21,6 +20,7 @@ const clearNearEndCallbackTimerId = () => {
   clearTimeout(nearEndCallbackTimerId);
   nearEndCallbackTimerId = null;
 };
+const defaultGetServerOffset = () => 0;
 
 /**
  * self-defined hook to manage logic related to timeInfo state update
@@ -28,9 +28,10 @@ const clearNearEndCallbackTimerId = () => {
  * @param {int} targetTime - countdown's target/deadline time, in milliseconds since Jan 1st, 1970, UTC
  * @param {function} nearEndCallback - optional callback to execute when the time remaining is within nearEndThreshold
  * @param {int} nearEndThreshold - threshold in milliseconds before targe time for nearEnd callbacks and update interval to take effect
- * @param {int} nearEndUpdateInterval - update frequency in milliseconds, when the countdown is within the threshold
  * @param {boolean} nearEndShowSeconds - whether to show seconds string when the countdown is near the end
+ * @param {int} nearEndUpdateInterval - update frequency in milliseconds, when the countdown is within the threshold
  * @param {int} roundToNearestSecondInterval - number of milliseconds before each round to nearest second attempt
+ * @param {function} getLatestServerOffset - function to get the latest server offset in milliseconds
  * @param {Object} updateFrequencyConfig - updateInterval config { updateInterval: <num_milliseconds>, showSeconds: <bool> }
  *
  * @returns {Object} - timeInfo state, an object indicating the timeInfo state, refer to ./utils.js for more
@@ -39,14 +40,15 @@ const useCountdown = ({
   targetTime,
   nearEndCallback = null,
   nearEndThreshold = 60000,
+  nearEndShowSeconds = true,
   nearEndUpdateInterval = 1000,
-  nearEndShowSeconds = true, // * for the sake of simplicity,
   roundToNearestSecondInterval = 60000,
+  getLatestServerOffset = defaultGetServerOffset,
   updateFrequencyConfig = { updateInterval: 60000, showSeconds: false },
 }) => {
   // * init the currentTime, ceiling to the nearest second
   const [currentTime, setCurrentTime] = useState(
-    serverTimeManager.getLatestOffset() + Date.now() || Date.now(),
+    getLatestServerOffset() + Date.now() || Date.now(),
   );
   const [updateInterval, setUpdateInterval] = useState(
     targetTime - currentTime <= nearEndThreshold
@@ -69,8 +71,8 @@ const useCountdown = ({
    * update currentTime callback
    */
   const updateCurrentTime = useCallback(() => {
-    setCurrentTime(serverTimeManager.getLatestOffset() + Date.now() || Date.now());
-  }, []);
+    setCurrentTime(getLatestServerOffset() + Date.now() || Date.now());
+  }, [getLatestServerOffset]);
 
   /**
    * round to the nearest second
@@ -85,7 +87,7 @@ const useCountdown = ({
 
     // * compute the delay
     const nearestSecond =
-      Math.ceil((serverTimeManager.getLatestOffset() + Date.now() || Date.now()) / 1000) * 1000;
+      Math.ceil((getLatestServerOffset() + Date.now() || Date.now()) / 1000) * 1000;
     const delay = nearestSecond - Date.now();
 
     // * restart everything
@@ -97,7 +99,7 @@ const useCountdown = ({
         timerIdCallback: (newTimerId) => (countdownTimeIntervalId = newTimerId),
       });
     }, delay);
-  }, [updateInterval, updateCurrentTime]);
+  }, [getLatestServerOffset, updateInterval, updateCurrentTime]);
 
   /**
    * callback to start countdown
@@ -143,7 +145,7 @@ const useCountdown = ({
    * 2, call the nearEnd callback if any
    */
   useEffect(() => {
-    const now = serverTimeManager.getLatestOffset() + Date.now() || Date.now();
+    const now = getLatestServerOffset() + Date.now() || Date.now();
     if (targetTime - now > nearEndThreshold) {
       nearEndCallbackTimerId = setTimeout(
         () => {
@@ -157,7 +159,14 @@ const useCountdown = ({
       if (typeof nearEndCallback === "function") nearEndCallback();
     }
     return clearNearEndCallbackTimerId;
-  }, [nearEndCallback, nearEndShowSeconds, nearEndThreshold, nearEndUpdateInterval, targetTime]);
+  }, [
+    targetTime,
+    nearEndCallback,
+    nearEndThreshold,
+    nearEndShowSeconds,
+    getLatestServerOffset,
+    nearEndUpdateInterval,
+  ]);
   return timeInfo;
 };
 

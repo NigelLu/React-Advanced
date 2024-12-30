@@ -66,5 +66,6 @@ class ServerTimeManager {
 }
 
 const serverTimeManager = new ServerTimeManager({ fetchServerTime: getTimeStampFromServer });
+const getLatestOffset = serverTimeManager.getLatestOffset.bind(serverTimeManager);
 
-export default serverTimeManager;
+export { serverTimeManager, getLatestOffset };
